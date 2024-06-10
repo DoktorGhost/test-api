@@ -4,9 +4,13 @@ import (
 	"api/internal/storage"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"log"
 	"sync"
+	"time"
 )
 
 type PostgresStorage struct {
@@ -15,8 +19,8 @@ type PostgresStorage struct {
 }
 
 // NewPostgresRepository создает новый экземпляр PostgresRepository.
-func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
-	db, err := sql.Open("pgx", dsn)
+func NewPostgresStorage(databaseURL string) (*PostgresStorage, error) {
+	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -34,46 +38,97 @@ func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
 	createTableQuery := `
     CREATE TABLE IF NOT EXISTS users (
         ID UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        Firstname VARCHAR(100) NOT NULL,
-        Lastname VARCHAR(100) NOT NULL,
+        Firstname VARCHAR(50) NOT NULL,
+        Lastname VARCHAR(50) NOT NULL,
         Email VARCHAR(255) NOT NULL UNIQUE,
         Age INT NOT NULL,
-        CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        Created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     `
 	if _, err = db.Exec(createTableQuery); err != nil {
-		log.Println(err)
+		log.Println("Ошибка создания таблицы: ", err)
 		return nil, err
 	}
-
+	log.Println("Таблица успешно создана")
 	return &PostgresStorage{db: db}, nil
 }
 
+func (r *PostgresStorage) Create(user storage.User) (uuid.UUID, error) {
+	//генерируем ID
+	user.ID = uuid.New()
+	//время создания записи
+	user.Created = time.Now()
+
+	query := `
+    INSERT INTO users (id, firstname, lastname, email, age, created)
+    VALUES ($1, $2, $3, $4, $5, $6)`
+
+	//проверка ID на уникальность в БД
+	for {
+		_, err := r.db.Exec(query, user.ID, user.Firstname, user.Lastname, user.Email, user.Age, user.Created)
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+				// код ошибки уникальности "23505" в Postgres, генерируем по новой
+				user.ID = uuid.New()
+				continue
+			}
+			return uuid.Nil, err
+		}
+		break
+	}
+	log.Println("Запись добавлена. ID: ", user.ID)
+	return user.ID, nil
+}
+
 func (r *PostgresStorage) Read(id uuid.UUID) (storage.User, error) {
+	var user storage.User
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var url string
-	err := r.db.QueryRow("SELECT url FROM urls WHERE short_url = $1", shortURL).Scan(&url)
+
+	err := r.db.QueryRow("SELECT id, firstname, lastname, email, age, created FROM users WHERE ID = $1", id).Scan(&user.ID, &user.Firstname, &user.Lastname, &user.Email, &user.Age, &user.Created)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", errors.New("url not found")
+			return storage.User{}, fmt.Errorf("user with ID %s not found", id)
 		}
-		return "", err
+		return storage.User{}, err
 	}
-	return url, nil
+	return user, nil
 }
 
-func (r *PostgresStorage) Create(user storage.User) (string, error) {
-
-}
-
-func (r *PostgresStorage) Delete(shortURL string) error {
+func (r *PostgresStorage) Delete(id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	query := "DELETE FROM urls WHERE short_url = $1 AND url = $1"
-	_, err := r.db.Exec(query, shortURL)
+	query := "DELETE FROM users WHERE id = $1"
+	_, err := r.db.Exec(query, id)
 	if err != nil {
+		log.Println("Ошибка удаления записи с ID: ", id)
 		return err
 	}
+	log.Println("Запсь удалена. ID: ", id)
 	return nil
+}
+
+func (r *PostgresStorage) Update(user storage.User) error {
+	r.mu.Lock() // Locking for writing
+	defer r.mu.Unlock()
+
+	query := `
+    UPDATE users
+    SET firstname = $2, lastname = $3, email = $4, age = $5
+    WHERE id = $1`
+
+	_, err := r.db.Exec(query, user.ID, user.Firstname, user.Lastname, user.Email, user.Age)
+	if err != nil {
+		log.Println("Ошибка обновления записи с ID: ", user.ID)
+		return err
+	}
+	log.Println("Запсь обновлена. ID: ", user.ID)
+	return nil
+}
+
+func (ps *PostgresStorage) Close() error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	return ps.db.Close()
 }

@@ -28,7 +28,7 @@ func validateLastname(surname string) (string, error) {
 		f := cases.Title(language.Und)
 		return f.String(surname), nil
 	}
-	return "", errors.New("invalid surname")
+	return "", errors.New("invalid lastname")
 }
 
 // Функция для валидации email

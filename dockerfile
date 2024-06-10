@@ -6,7 +6,7 @@ ENV POSTGRES_PASSWORD admin
 ENV POSTGRES_DB admin
 
 # Открытие порта для доступа к PostgreSQL
-EXPOSE 5432
+EXPOSE 5433
 
 # Запуск PostgreSQL при запуске контейнера
 CMD ["postgres"]

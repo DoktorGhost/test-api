@@ -10,7 +10,7 @@ import (
 )
 
 func StartServer(conf *config.Config) error {
-	db, err := postgres.NewPostgresStorage(conf.DatabaseDSN)
+	db, err := postgres.NewPostgresStorage(conf)
 	if err != nil {
 		log.Fatal("Ошибка подключения к БД: ", err)
 	}
@@ -20,7 +20,7 @@ func StartServer(conf *config.Config) error {
 	r := handlers.InitRoutes(*UseCaseDB)
 
 	//запускаем сервер
-	err = http.ListenAndServe(conf.Host+":"+conf.Port, r)
+	err = http.ListenAndServe(conf.ApiHost+":"+conf.ApiPort, r)
 	if err != nil {
 		log.Fatal("Ошибка старта сервера: ", err)
 	}

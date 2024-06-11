@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"api/internal/config"
 	"api/internal/storage"
 	"database/sql"
 	"errors"
@@ -19,8 +20,12 @@ type PostgresStorage struct {
 }
 
 // NewPostgresRepository создает новый экземпляр PostgresRepository.
-func NewPostgresStorage(databaseURL string) (*PostgresStorage, error) {
-	db, err := sql.Open("pgx", databaseURL)
+func NewPostgresStorage(conf *config.Config) (*PostgresStorage, error) {
+
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		conf.DBHost, conf.DBPort, conf.DBUser, conf.DBPass, conf.DBName)
+	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		return nil, err
 	}

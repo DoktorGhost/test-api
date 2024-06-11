@@ -6,17 +6,20 @@ import (
 )
 
 type Config struct {
-	Host        string `env:"HOST"`
-	Port        string `env:"PORT"`
-	DatabaseDSN string `env:"DATABASE_DSN"`
+	DBHost  string `env:"DB_HOST"`
+	DBPort  string `env:"DB_PORT"`
+	DBUser  string `env:"DB_USER"`
+	DBPass  string `env:"DB_PASSWORD"`
+	DBName  string `env:"DB_NAME"`
+	ApiPort string `env:"API_PORT"`
+	ApiHost string `env:"API_HOST"`
 }
 
-func ParseConfigServer() *Config {
+func ParseConfigServer() Config {
 	// Чтение переменных окружения
-	config := &Config{}
+	config := Config{}
 	if err := env.Parse(&config); err != nil {
 		log.Println(err)
 	}
-
 	return config
 }

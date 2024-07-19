@@ -1,3 +1,7 @@
+<p align="left">
+      <img src="https://i.ibb.co/cYzQsPG/logoza-ru.png" alt="Project Logo" width="726">
+</p>
+
 ## Настройка переменных окружения
 Если запускаем через контейнер, то .env не меняем.
 
